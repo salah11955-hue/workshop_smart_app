@@ -1,0 +1,16 @@
+{
+  "workshop_name": "ورشة خبراء هونداي وفورد",
+  "primary_contact": "775008077",
+  "location": "صنعاء، جولة ٤٥، خلف مطعم الخطيب",
+  "system_version": "1.0.0",
+  "database": {
+    "type": "sqlite",
+    "name": "workshop_data.db"
+  },
+  "modules": {
+    "customers": true,
+    "vehicles": true,
+    "diagnostics": true,
+    "invoices": true
+  }
+}
