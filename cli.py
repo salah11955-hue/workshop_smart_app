@@ -2,6 +2,7 @@ import json
 from app import add_customer, create_invoice
 from database import init_db
 from reports import show_all_customers, show_all_invoices
+from diagnostics import add_diagnostic_report, show_customer_diagnostics
 
 with open('config.json', 'r', encoding='utf-8') as f:
     config = json.load(f)
@@ -13,12 +14,14 @@ def main_menu():
         print(f"📍 العنوان: {config['location']} | ☎️ للتواصل: {config['primary_contact']}")
         print("----------------------------------------")
         print("1. تسجيل عميل ومركبة جديدة")
-        print("2. إصدار فاتورة صيانة جديدة")
-        print("3. استعراض سجل العملاء والمركبات")
-        print("4. استعراض فواتير الصيانة وإجمالي الإيرادات")
-        print("5. خروج من النظام")
+        print("2. تسجيل تقرير فحص كمبيوتر وأكواد أعطال (DTC)")
+        print("3. استعراض فحوصات الأعطال لعميل")
+        print("4. إصدار فاتورة صيانة جديدة")
+        print("5. استعراض سجل العملاء والمركبات")
+        print("6. استعراض فواتير الصيانة وإجمالي الإيرادات")
+        print("7. خروج من النظام")
         
-        choice = input("\nاختر رقم العملية المطلوبة (1-5): ").strip()
+        choice = input("\nاختر رقم العملية المطلوبة (1-7): ").strip()
         
         if choice == '1':
             print("\n--- تسجيل بيانات العميل والسيارة ---")
@@ -31,6 +34,25 @@ def main_menu():
             add_customer(name, phone, car_model, plate_number, notes)
             
         elif choice == '2':
+            print("\n--- تسجيل تقرير فحص بالكمبيوتر ---")
+            try:
+                customer_id = int(input("أدخل معرف العميل (Customer ID): ").strip())
+                system_type = input("النظام المعني (مثلاً: المحرك / قير / إنفرتر هجين / منظومة التوجيه): ").strip()
+                dtc_codes = input("أكواد الأعطال DTC (مثلاً: P0300, P0A80): ").strip()
+                technician_notes = input("ملاحظات الفحص التشخيصي والتوصيات: ").strip()
+                
+                add_diagnostic_report(customer_id, system_type, dtc_codes, technician_notes)
+            except ValueError:
+                print("⚠️ خطأ في الإدخال: يرجى التأكد من كتابة رقم صحيح لمعرف العميل.")
+                
+        elif choice == '3':
+            try:
+                customer_id = int(input("أدخل معرف العميل لاستعراض فحوصاته: ").strip())
+                show_customer_diagnostics(customer_id)
+            except ValueError:
+                print("⚠️ خطأ في الإدخال: يرجى التأكد من كتابة رقم صحيح لمعرف العميل.")
+                
+        elif choice == '4':
             print("\n--- إصدار فاتورة صيانة ---")
             try:
                 customer_id = int(input("أدخل معرف العميل (Customer ID): ").strip())
@@ -42,17 +64,17 @@ def main_menu():
             except ValueError:
                 print("⚠️ خطأ في الإدخال: يرجى التأكد من كتابة أرقام صحيحة لتكاليف القطع وأجور العمل.")
                 
-        elif choice == '3':
+        elif choice == '5':
             show_all_customers()
             
-        elif choice == '4':
+        elif choice == '6':
             show_all_invoices()
             
-        elif choice == '5':
+        elif choice == '7':
             print(f"\nمع السلامة يا مهندس صلاح. نتمنى لك التوفيق في إدارة {config['workshop_name']}.")
             break
         else:
-            print("⚠️ خيار غير صحيح، يرجى اختيار رقم بين 1 و 5.")
+            print("⚠️ خيار غير صحيح، يرجى اختيار رقم بين 1 و 7.")
 
 if __name__ == '__main__':
     main_menu()
