@@ -1,12 +1,11 @@
-import json
 import sqlite3
+from config import get_database_path, load_config
 
-with open('config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
+config = load_config()
 
 def show_all_customers():
     """عرض قائمة بجميع العملاء والسيارات المسجلة في الورشة"""
-    conn = sqlite3.connect(config['database']['name'])
+    conn = sqlite3.connect(get_database_path())
     cursor = conn.cursor()
     cursor.execute('SELECT id, name, phone, car_model, plate_number, notes, created_at FROM customers')
     customers = cursor.fetchall()
@@ -25,7 +24,7 @@ def show_all_customers():
 
 def show_all_invoices():
     """عرض كافة فواتير الصيانة وإجمالي الإيرادات"""
-    conn = sqlite3.connect(config['database']['name'])
+    conn = sqlite3.connect(get_database_path())
     cursor = conn.cursor()
     cursor.execute('''
         SELECT invoices.id, customers.name, customers.car_model, invoices.service_details, 

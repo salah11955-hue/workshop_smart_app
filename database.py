@@ -1,11 +1,8 @@
 import sqlite3
-import json
+from config import get_database_path, load_config
 
-# تحميل الإعدادات الأساسية للورشة من ملف config.json
-with open('config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
-
-db_name = config['database']['name']
+config = load_config()
+db_name = get_database_path()
 
 def init_db():
     """إنشاء قاعدة البيانات وجداول النظام الأساسية لورشة خبراء هونداي وفورد"""

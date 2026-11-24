@@ -1,12 +1,11 @@
-import json
+from config import load_config
 from app import add_customer, create_invoice
 from database import init_db
 from reports import show_all_customers, show_all_invoices
 from diagnostics import add_diagnostic_report, show_customer_diagnostics
 from inventory import add_inventory_item, show_inventory
 
-with open('config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
+config = load_config()
 
 def main_menu():
     init_db()

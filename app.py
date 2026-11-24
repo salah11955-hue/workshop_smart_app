@@ -1,14 +1,12 @@
-import json
 import sqlite3
+from config import get_database_path, load_config
 from database import init_db
 
-# تحميل بيانات الورشة الأساسية
-with open('config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
+config = load_config()
 
 def add_customer(name, phone, car_model, plate_number, notes=""):
     """إضافة عميل وسيارة جديدة إلى قاعدة بيانات الورشة"""
-    conn = sqlite3.connect(config['database']['name'])
+    conn = sqlite3.connect(get_database_path())
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO customers (name, phone, car_model, plate_number, notes)
@@ -23,7 +21,7 @@ def add_customer(name, phone, car_model, plate_number, notes=""):
 def create_invoice(customer_id, service_details, parts_cost, labor_cost):
     """حساب وإنشاء فاتورة صيانة للعميل بالريال"""
     total_amount = parts_cost + labor_cost
-    conn = sqlite3.connect(config['database']['name'])
+    conn = sqlite3.connect(get_database_path())
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO invoices (customer_id, service_details, parts_cost, labor_cost, total_amount)

@@ -1,12 +1,11 @@
-import json
 import sqlite3
+from config import get_database_path, load_config
 
-with open('config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
+config = load_config()
 
 def add_diagnostic_report(customer_id, system_type, dtc_codes, technician_notes):
     """تسجيل تقرير فحص بالكمبيوتر وأكواد الأعطال للسيارة"""
-    conn = sqlite3.connect(config['database']['name'])
+    conn = sqlite3.connect(get_database_path())
     cursor = conn.cursor()
     
     # التأكد من وجود جدول الفحوصات أو إنشائه تلقائياً
@@ -33,7 +32,7 @@ def add_diagnostic_report(customer_id, system_type, dtc_codes, technician_notes)
 
 def show_customer_diagnostics(customer_id):
     """استعراض تقارير الفحص السابقة لعميل معين"""
-    conn = sqlite3.connect(config['database']['name'])
+    conn = sqlite3.connect(get_database_path())
     cursor = conn.cursor()
     cursor.execute('''
         SELECT diagnostics.id, diagnostics.system_type, diagnostics.dtc_codes, 

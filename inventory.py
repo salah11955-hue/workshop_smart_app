@@ -1,12 +1,11 @@
-import json
 import sqlite3
+from config import get_database_path, load_config
 
-with open('config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
+config = load_config()
 
 def add_inventory_item(part_number, part_name, category, quantity, unit_price):
     """إضافة قطعة غيار جديدة أو تحديث الكمية في المخزون"""
-    conn = sqlite3.connect(config['database']['name'])
+    conn = sqlite3.connect(get_database_path())
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -36,7 +35,7 @@ def add_inventory_item(part_number, part_name, category, quantity, unit_price):
 
 def show_inventory():
     """استعراض كافة قطع الغيار المتوفرة في مخزون الورشة"""
-    conn = sqlite3.connect(config['database']['name'])
+    conn = sqlite3.connect(get_database_path())
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS inventory (
