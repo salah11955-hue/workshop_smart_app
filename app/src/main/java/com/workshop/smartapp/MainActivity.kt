@@ -902,3 +902,7 @@ private fun FormDialog(
 
 private fun money(value: Double): String =
     String.format(Locale.getDefault(), "%.2f", value)
+data class CustomerOption(
+    val id: Long,
+    val label: String
+)
