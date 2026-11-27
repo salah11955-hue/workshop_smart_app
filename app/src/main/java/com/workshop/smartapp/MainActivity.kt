@@ -331,10 +331,13 @@ private fun FormDialog(type: FormType, onDismiss: () -> Unit, onSave: (List<Stri
                     )
                 }
                 
-    text = it,
-    modifier = Modifier.padding(top = 8.dp),
-    color = MaterialTheme.colorScheme.error
-)
+                    error?.let {
+                    Text(
+                        text = it,
+                        modifier = Modifier.padding(top = 8.dp),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
         },
         confirmButton = { TextButton(onClick = { error = onSave(values.toList()) }) { Text("حفظ") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
