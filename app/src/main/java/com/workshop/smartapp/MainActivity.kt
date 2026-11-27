@@ -330,7 +330,7 @@ private fun FormDialog(type: FormType, onDismiss: () -> Unit, onSave: (List<Stri
                         singleLine = !field.first.contains("ملاحظات") && !field.first.contains("تفاصيل")
                     )
                 }
-                Text(
+                
     text = it,
     modifier = Modifier.padding(top = 8.dp),
     color = MaterialTheme.colorScheme.error
