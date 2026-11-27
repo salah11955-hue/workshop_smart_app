@@ -1,0 +1,43 @@
+import sqlite3
+from config import get_database_path, load_config
+
+config = load_config()
+db_name = get_database_path()
+
+
+def init_db():
+    """إنشاء قاعدة البيانات وجداول النظام الأساسية للورشة"""
+    with sqlite3.connect(db_name) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS customers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                car_model TEXT,
+                plate_number TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS invoices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                customer_id INTEGER,
+                service_details TEXT,
+                parts_cost REAL,
+                labor_cost REAL,
+                total_amount REAL,
+                invoice_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (customer_id) REFERENCES customers (id)
+            )
+            """
+        )
+    print(f"تم تهيئة قاعدة البيانات '{db_name}' بنجاح لصالح {config['workshop_name']}.")
+
+
+if __name__ == "__main__":
+    init_db()
