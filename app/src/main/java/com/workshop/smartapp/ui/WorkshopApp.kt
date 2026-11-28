@@ -2,29 +2,11 @@
 package com.workshop.smartapp.ui
 
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
@@ -45,23 +27,91 @@ private const val WORKSHOP_NAME = "ورشة خبراء هونداي وفورد"
 private const val CONTACT = "775008077"
 private const val LOCATION = "صنعاء، جولة ٤٥، خلف مطعم الخطيب"
 
+private data class EditorState(
+    val form: WorkshopForm,
+    val recordId: Long? = null,
+    val oldPartNumber: String? = null,
+    val initialValues: List<String> = emptyList()
+)
+
+private data class DeleteRequest(
+    val form: WorkshopForm,
+    val recordId: Long? = null,
+    val partNumber: String? = null,
+    val title: String
+)
+
 @Composable
 fun WorkshopApp(database: WorkshopDatabase) {
     var page by remember { mutableStateOf(WorkshopPage.HOME) }
-    var activeForm by remember { mutableStateOf<WorkshopForm?>(null) }
+    var editor by remember { mutableStateOf<EditorState?>(null) }
+    var deleteRequest by remember { mutableStateOf<DeleteRequest?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
     var refreshKey by remember { mutableIntStateOf(0) }
 
-    val customers = remember(refreshKey) {
-        database.customers()
+    val customers = remember(refreshKey) { database.customers() }
+    val diagnostics = remember(refreshKey) { database.diagnostics() }
+    val invoices = remember(refreshKey) { database.invoices() }
+    val parts = remember(refreshKey) { database.inventory() }
+
+    fun refresh() {
+        refreshKey++
     }
-    val diagnostics = remember(refreshKey) {
-        database.diagnostics()
+
+    fun openAdd(form: WorkshopForm) {
+        editor = EditorState(form = form)
     }
-    val invoices = remember(refreshKey) {
-        database.invoices()
+
+    fun openCustomerEdit(item: Customer) {
+        editor = EditorState(
+            form = WorkshopForm.CUSTOMER,
+            recordId = item.id,
+            initialValues = listOf(
+                item.name,
+                item.phone,
+                item.car,
+                item.plate,
+                item.notes
+            )
+        )
     }
-    val parts = remember(refreshKey) {
-        database.inventory()
+
+    fun openDiagnosticEdit(item: Diagnostic) {
+        editor = EditorState(
+            form = WorkshopForm.DIAGNOSTIC,
+            recordId = item.id,
+            initialValues = listOf(
+                item.system,
+                item.codes,
+                item.notes
+            )
+        )
+    }
+
+    fun openInvoiceEdit(item: Invoice) {
+        editor = EditorState(
+            form = WorkshopForm.INVOICE,
+            recordId = item.id,
+            initialValues = listOf(
+                item.details,
+                item.parts.toString(),
+                item.labor.toString()
+            )
+        )
+    }
+
+    fun openPartEdit(item: Part) {
+        editor = EditorState(
+            form = WorkshopForm.PART,
+            oldPartNumber = item.number,
+            initialValues = listOf(
+                item.number,
+                item.name,
+                item.category,
+                item.quantity.toString(),
+                item.price.toString()
+            )
+        )
     }
 
     CompositionLocalProvider(
@@ -88,7 +138,7 @@ fun WorkshopApp(database: WorkshopDatabase) {
                         style = MaterialTheme.typography.bodySmall
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(Modifier.height(12.dp))
 
                     Row(
                         modifier = Modifier
@@ -96,9 +146,7 @@ fun WorkshopApp(database: WorkshopDatabase) {
                             .horizontalScroll(rememberScrollState())
                     ) {
                         WorkshopPage.values().forEach { item ->
-                            TextButton(
-                                onClick = { page = item }
-                            ) {
+                            TextButton(onClick = { page = item }) {
                                 Text(
                                     text = item.title,
                                     fontWeight = if (page == item) {
@@ -111,7 +159,7 @@ fun WorkshopApp(database: WorkshopDatabase) {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(Modifier.height(8.dp))
 
                     Column(
                         modifier = Modifier
@@ -128,51 +176,170 @@ fun WorkshopApp(database: WorkshopDatabase) {
                                 navigate = { page = it }
                             )
 
-                            WorkshopPage.CUSTOMERS ->
-                                CustomersPage(customers) {
-                                    activeForm = WorkshopForm.CUSTOMER
+                            WorkshopPage.CUSTOMERS -> CustomersPage(
+                                items = customers,
+                                add = { openAdd(WorkshopForm.CUSTOMER) },
+                                edit = ::openCustomerEdit,
+                                delete = {
+                                    deleteRequest = DeleteRequest(
+                                        form = WorkshopForm.CUSTOMER,
+                                        recordId = it.id,
+                                        title = "العميل ${it.name}"
+                                    )
                                 }
+                            )
 
-                            WorkshopPage.DIAGNOSTICS ->
-                                DiagnosticsPage(diagnostics) {
-                                    activeForm = WorkshopForm.DIAGNOSTIC
+                            WorkshopPage.DIAGNOSTICS -> DiagnosticsPage(
+                                items = diagnostics,
+                                add = { openAdd(WorkshopForm.DIAGNOSTIC) },
+                                edit = ::openDiagnosticEdit,
+                                delete = {
+                                    deleteRequest = DeleteRequest(
+                                        form = WorkshopForm.DIAGNOSTIC,
+                                        recordId = it.id,
+                                        title = "تقرير الفحص رقم ${it.id}"
+                                    )
                                 }
+                            )
 
-                            WorkshopPage.INVOICES ->
-                                InvoicesPage(invoices) {
-                                    activeForm = WorkshopForm.INVOICE
+                            WorkshopPage.INVOICES -> InvoicesPage(
+                                items = invoices,
+                                add = { openAdd(WorkshopForm.INVOICE) },
+                                edit = ::openInvoiceEdit,
+                                delete = {
+                                    deleteRequest = DeleteRequest(
+                                        form = WorkshopForm.INVOICE,
+                                        recordId = it.id,
+                                        title = "الفاتورة رقم ${it.id}"
+                                    )
                                 }
+                            )
 
-                            WorkshopPage.INVENTORY ->
-                                InventoryPage(parts) {
-                                    activeForm = WorkshopForm.PART
+                            WorkshopPage.INVENTORY -> InventoryPage(
+                                items = parts,
+                                add = { openAdd(WorkshopForm.PART) },
+                                edit = ::openPartEdit,
+                                delete = {
+                                    deleteRequest = DeleteRequest(
+                                        form = WorkshopForm.PART,
+                                        partNumber = it.number,
+                                        title = "قطعة الغيار ${it.name}"
+                                    )
                                 }
+                            )
                         }
                     }
                 }
             }
 
-            activeForm?.let { form ->
+            editor?.let { current ->
                 WorkshopFormDialog(
-                    type = form,
+                    type = current.form,
                     customers = customers,
-                    onDismiss = {
-                        activeForm = null
+                    initialValues = current.initialValues,
+                    showCustomerPicker = current.recordId == null &&
+                        current.form.requiresCustomer,
+                    dialogTitle = if (current.recordId != null ||
+                        current.oldPartNumber != null) {
+                        "تعديل ${current.form.title}"
+                    } else {
+                        current.form.title
                     },
+                    saveLabel = if (current.recordId != null ||
+                        current.oldPartNumber != null) "حفظ التعديلات" else "حفظ",
+                    onDismiss = { editor = null },
                     onSave = { submission ->
                         val error = saveForm(
-                            form = form,
+                            form = current.form,
                             submission = submission,
                             customers = customers,
-                            database = database
+                            database = database,
+                            recordId = current.recordId,
+                            oldPartNumber = current.oldPartNumber
                         )
 
                         if (error == null) {
-                            refreshKey++
-                            activeForm = null
+                            refresh()
+                            editor = null
+                            message = "تم حفظ البيانات بنجاح"
                         }
-
                         error
+                    }
+                )
+            }
+
+            deleteRequest?.let { request ->
+                AlertDialog(
+                    onDismissRequest = { deleteRequest = null },
+                    title = { Text("تأكيد الحذف") },
+                    text = {
+                        Text("هل أنت متأكد من حذف ${request.title}؟ لا يمكن التراجع عن هذه العملية.")
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                val result = try {
+                                    when (request.form) {
+                                        WorkshopForm.CUSTOMER ->
+                                            database.deleteCustomer(
+                                                request.recordId ?: -1L
+                                            )
+
+                                        WorkshopForm.DIAGNOSTIC ->
+                                            database.deleteDiagnostic(
+                                                request.recordId ?: -1L
+                                            )
+
+                                        WorkshopForm.INVOICE ->
+                                            database.deleteInvoice(
+                                                request.recordId ?: -1L
+                                            )
+
+                                        WorkshopForm.PART ->
+                                            database.deletePart(
+                                                request.partNumber.orEmpty()
+                                            )
+                                    }
+                                } catch (e: Exception) {
+                                    false
+                                }
+
+                                deleteRequest = null
+
+                                if (result) {
+                                    refresh()
+                                    message = "تم الحذف بنجاح"
+                                } else {
+                                    message = when (request.form) {
+                                        WorkshopForm.CUSTOMER ->
+                                            "تعذر حذف العميل: توجد مركبات أو زيارات أو تقارير أو فواتير مرتبطة به. احذف السجلات التابعة أولاً."
+
+                                        else ->
+                                            "تعذر إتمام الحذف. قد يكون السجل غير موجود أو مرتبطاً ببيانات أخرى."
+                                    }
+                                }
+                            }
+                        ) {
+                            Text("حذف")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { deleteRequest = null }) {
+                            Text("إلغاء")
+                        }
+                    }
+                )
+            }
+
+            message?.let { text ->
+                AlertDialog(
+                    onDismissRequest = { message = null },
+                    title = { Text("إشعار") },
+                    text = { Text(text) },
+                    confirmButton = {
+                        TextButton(onClick = { message = null }) {
+                            Text("حسناً")
+                        }
                     }
                 )
             }
@@ -184,7 +351,9 @@ private fun saveForm(
     form: WorkshopForm,
     submission: WorkshopFormSubmission,
     customers: List<Customer>,
-    database: WorkshopDatabase
+    database: WorkshopDatabase,
+    recordId: Long? = null,
+    oldPartNumber: String? = null
 ): String? {
     val values = submission.fields
 
@@ -193,19 +362,28 @@ private fun saveForm(
             WorkshopForm.CUSTOMER -> {
                 if (values.size < 5) {
                     "بيانات النموذج غير مكتملة"
-                } else if (
-                    values[0].isBlank() ||
-                    values[1].isBlank()
-                ) {
+                } else if (values[0].isBlank() || values[1].isBlank()) {
                     "اسم العميل ورقم الهاتف مطلوبان"
                 } else {
-                    database.addCustomer(
-                        name = values[0].trim(),
-                        phone = values[1].trim(),
-                        car = values[2].trim(),
-                        plate = values[3].trim(),
-                        notes = values[4].trim()
-                    )
+                    if (recordId == null) {
+                        database.addCustomer(
+                            values[0].trim(),
+                            values[1].trim(),
+                            values[2].trim(),
+                            values[3].trim(),
+                            values[4].trim()
+                        )
+                    } else {
+                        val updated = database.updateCustomer(
+                            recordId,
+                            values[0].trim(),
+                            values[1].trim(),
+                            values[2].trim(),
+                            values[3].trim(),
+                            values[4].trim()
+                        )
+                        if (!updated) return "لم يتم العثور على العميل المطلوب تعديله"
+                    }
                     null
                 }
             }
@@ -215,28 +393,36 @@ private fun saveForm(
                     return "بيانات التقرير غير مكتملة"
                 }
 
-                val customerId = submission.customerId
+                if (values[0].isBlank()) {
+                    return "اسم النظام مطلوب"
+                }
 
-                when {
-                    customerId == null ->
-                        "اختر عميلاً أولاً"
+                if (recordId == null) {
+                    val customerId = submission.customerId
+                        ?: return "اختر عميلاً أولاً"
 
-                    customers.none { it.id == customerId } ->
-                        "العميل المختار غير موجود"
+                    if (customers.none { it.id == customerId }) {
+                        return "العميل المختار غير موجود"
+                    }
 
-                    values[0].isBlank() ->
-                        "اسم النظام مطلوب"
-
-                    else -> {
-                        database.addDiagnostic(
-                            customerId = customerId,
-                            system = values[0].trim(),
-                            codes = values[1].trim(),
-                            notes = values[2].trim()
+                    database.addDiagnostic(
+                        customerId,
+                        values[0].trim(),
+                        values[1].trim(),
+                        values[2].trim()
+                    )
+                } else {
+                    if (!database.updateDiagnostic(
+                            recordId,
+                            values[0].trim(),
+                            values[1].trim(),
+                            values[2].trim()
                         )
-                        null
+                    ) {
+                        return "لم يتم العثور على التقرير المطلوب تعديله"
                     }
                 }
+                null
             }
 
             WorkshopForm.INVOICE -> {
@@ -244,36 +430,42 @@ private fun saveForm(
                     return "بيانات الفاتورة غير مكتملة"
                 }
 
-                val customerId = submission.customerId
                 val partsCost = values[1].toDoubleOrNull()
                 val laborCost = values[2].toDoubleOrNull()
 
-                when {
-                    customerId == null ->
-                        "اختر عميلاً أولاً"
+                if (values[0].isBlank()) return "تفاصيل الصيانة مطلوبة"
+                if (partsCost == null || laborCost == null ||
+                    partsCost < 0 || laborCost < 0
+                ) {
+                    return "أدخل تكاليف صحيحة غير سالبة"
+                }
 
-                    customers.none { it.id == customerId } ->
-                        "العميل المختار غير موجود"
+                if (recordId == null) {
+                    val customerId = submission.customerId
+                        ?: return "اختر عميلاً أولاً"
 
-                    values[0].isBlank() ->
-                        "تفاصيل الصيانة مطلوبة"
+                    if (customers.none { it.id == customerId }) {
+                        return "العميل المختار غير موجود"
+                    }
 
-                    partsCost == null ||
-                        laborCost == null ||
-                        partsCost < 0 ||
-                        laborCost < 0 ->
-                        "أدخل تكاليف صحيحة غير سالبة"
-
-                    else -> {
-                        database.addInvoice(
-                            customerId = customerId,
-                            details = values[0].trim(),
-                            parts = partsCost,
-                            labor = laborCost
+                    database.addInvoice(
+                        customerId,
+                        values[0].trim(),
+                        partsCost,
+                        laborCost
+                    )
+                } else {
+                    if (!database.updateInvoice(
+                            recordId,
+                            values[0].trim(),
+                            partsCost,
+                            laborCost
                         )
-                        null
+                    ) {
+                        return "لم يتم العثور على الفاتورة المطلوبة"
                     }
                 }
+                null
             }
 
             WorkshopForm.PART -> {
@@ -284,34 +476,42 @@ private fun saveForm(
                 val quantity = values[3].toIntOrNull()
                 val price = values[4].toDoubleOrNull()
 
-                when {
-                    values[0].isBlank() ||
-                        values[1].isBlank() ->
-                        "رقم القطعة واسمها مطلوبان"
+                if (values[0].isBlank() || values[1].isBlank()) {
+                    return "رقم القطعة واسمها مطلوبان"
+                }
 
-                    quantity == null ||
-                        quantity < 0 ||
-                        price == null ||
-                        price < 0 ->
-                        "أدخل كمية وسعراً صحيحين"
+                if (quantity == null || quantity < 0 ||
+                    price == null || price < 0
+                ) {
+                    return "أدخل كمية وسعراً صحيحين غير سالبين"
+                }
 
-                    else -> {
-                        database.addPart(
-                            number = values[0].trim(),
-                            name = values[1].trim(),
-                            category = values[2].trim(),
-                            quantity = quantity,
-                            price = price
+                if (oldPartNumber == null) {
+                    database.addPart(
+                        values[0].trim(),
+                        values[1].trim(),
+                        values[2].trim(),
+                        quantity,
+                        price
+                    )
+                } else {
+                    if (!database.updatePart(
+                            oldPartNumber,
+                            values[0].trim(),
+                            values[1].trim(),
+                            values[2].trim(),
+                            quantity,
+                            price
                         )
-                        null
+                    ) {
+                        return "لم يتم العثور على قطعة الغيار المطلوبة"
                     }
                 }
+                null
             }
         }
-    } catch (exception: Exception) {
-        "تعذر الحفظ: ${
-            exception.localizedMessage ?: "خطأ غير معروف"
-        }"
+    } catch (e: Exception) {
+        "تعذر حفظ البيانات: ${e.localizedMessage ?: "خطأ غير معروف"}"
     }
 }
 
@@ -324,25 +524,22 @@ private fun HomePage(
     navigate: (WorkshopPage) -> Unit
 ) {
     Text(
-        text = "إدارة الورشة من هاتفك",
+        "إدارة الورشة من هاتفك",
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold
     )
 
-    Spacer(modifier = Modifier.height(12.dp))
+    Spacer(Modifier.height(12.dp))
 
     SummaryCard("العملاء والمركبات", customerCount) {
         navigate(WorkshopPage.CUSTOMERS)
     }
-
     SummaryCard("تقارير الفحص", diagnosticCount) {
         navigate(WorkshopPage.DIAGNOSTICS)
     }
-
     SummaryCard("الفواتير", invoiceCount) {
         navigate(WorkshopPage.INVOICES)
     }
-
     SummaryCard("قطع الغيار", partCount) {
         navigate(WorkshopPage.INVENTORY)
     }
@@ -357,7 +554,8 @@ private fun SummaryCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 5.dp)
+            .padding(vertical = 5.dp),
+        onClick = onClick
     ) {
         Row(
             modifier = Modifier
@@ -365,14 +563,8 @@ private fun SummaryCard(
                 .padding(14.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = "$title: $count",
-                fontWeight = FontWeight.Bold
-            )
-
-            TextButton(onClick = onClick) {
-                Text("فتح")
-            }
+            Text("$title: $count", fontWeight = FontWeight.Bold)
+            Text("فتح")
         }
     }
 }
@@ -380,17 +572,13 @@ private fun SummaryCard(
 @Composable
 private fun CustomersPage(
     items: List<Customer>,
-    add: () -> Unit
+    add: () -> Unit,
+    edit: (Customer) -> Unit,
+    delete: (Customer) -> Unit
 ) {
-    PageTitle(
-        title = "العملاء والمركبات",
-        action = "تسجيل عميل",
-        onAction = add
-    )
+    PageTitle("العملاء والمركبات", "تسجيل عميل", add)
 
-    if (items.isEmpty()) {
-        EmptyMessage("لا يوجد عملاء مسجلون بعد.")
-    }
+    if (items.isEmpty()) EmptyMessage("لا يوجد عملاء مسجلون بعد.")
 
     items.forEach { customer ->
         InfoCard(
@@ -401,7 +589,9 @@ private fun CustomersPage(
                 اللوحة: ${customer.plate}
                 ملاحظات: ${customer.notes}
                 التسجيل: ${customer.createdAt}
-            """.trimIndent()
+            """.trimIndent(),
+            onEdit = { edit(customer) },
+            onDelete = { delete(customer) }
         )
     }
 }
@@ -409,27 +599,25 @@ private fun CustomersPage(
 @Composable
 private fun DiagnosticsPage(
     items: List<Diagnostic>,
-    add: () -> Unit
+    add: () -> Unit,
+    edit: (Diagnostic) -> Unit,
+    delete: (Diagnostic) -> Unit
 ) {
-    PageTitle(
-        title = "تقارير فحص الأعطال",
-        action = "إضافة تقرير",
-        onAction = add
-    )
+    PageTitle("تقارير فحص الأعطال", "إضافة تقرير", add)
 
-    if (items.isEmpty()) {
-        EmptyMessage("لا توجد تقارير فحص مسجلة بعد.")
-    }
+    if (items.isEmpty()) EmptyMessage("لا توجد تقارير فحص مسجلة بعد.")
 
-    items.forEach { diagnostic ->
+    items.forEach { item ->
         InfoCard(
-            title = "تقرير #${diagnostic.id} — ${diagnostic.customerName}",
+            title = "تقرير #${item.id} — ${item.customerName}",
             details = """
-                النظام: ${diagnostic.system}
-                أكواد DTC: ${diagnostic.codes}
-                ملاحظات الفني: ${diagnostic.notes}
-                التاريخ: ${diagnostic.date}
-            """.trimIndent()
+                النظام: ${item.system}
+                أكواد DTC: ${item.codes}
+                ملاحظات الفني: ${item.notes}
+                التاريخ: ${item.date}
+            """.trimIndent(),
+            onEdit = { edit(item) },
+            onDelete = { delete(item) }
         )
     }
 }
@@ -437,33 +625,31 @@ private fun DiagnosticsPage(
 @Composable
 private fun InvoicesPage(
     items: List<Invoice>,
-    add: () -> Unit
+    add: () -> Unit,
+    edit: (Invoice) -> Unit,
+    delete: (Invoice) -> Unit
 ) {
-    PageTitle(
-        title = "الفواتير والإيرادات",
-        action = "إصدار فاتورة",
-        onAction = add
-    )
+    PageTitle("الفواتير والإيرادات", "إصدار فاتورة", add)
 
     InfoCard(
         title = "إجمالي الإيرادات المسجلة",
         details = "${money(items.sumOf { it.total })} ريال"
     )
 
-    if (items.isEmpty()) {
-        EmptyMessage("لا توجد فواتير مسجلة بعد.")
-    }
+    if (items.isEmpty()) EmptyMessage("لا توجد فواتير مسجلة بعد.")
 
-    items.forEach { invoice ->
+    items.forEach { item ->
         InfoCard(
-            title = "فاتورة #${invoice.id} — ${invoice.customerName} (${invoice.car})",
+            title = "فاتورة #${item.id} — ${item.customerName} (${item.car})",
             details = """
-                الأعمال: ${invoice.details}
-                قطع الغيار: ${money(invoice.parts)} ريال
-                أجور اليد: ${money(invoice.labor)} ريال
-                الإجمالي: ${money(invoice.total)} ريال
-                التاريخ: ${invoice.date}
-            """.trimIndent()
+                الأعمال: ${item.details}
+                قطع الغيار: ${money(item.parts)} ريال
+                أجور اليد: ${money(item.labor)} ريال
+                الإجمالي: ${money(item.total)} ريال
+                التاريخ: ${item.date}
+            """.trimIndent(),
+            onEdit = { edit(item) },
+            onDelete = { delete(item) }
         )
     }
 }
@@ -471,26 +657,24 @@ private fun InvoicesPage(
 @Composable
 private fun InventoryPage(
     items: List<Part>,
-    add: () -> Unit
+    add: () -> Unit,
+    edit: (Part) -> Unit,
+    delete: (Part) -> Unit
 ) {
-    PageTitle(
-        title = "مخزون قطع الغيار",
-        action = "إضافة / تحديث",
-        onAction = add
-    )
+    PageTitle("مخزون قطع الغيار", "إضافة قطعة", add)
 
-    if (items.isEmpty()) {
-        EmptyMessage("لا توجد قطع غيار مسجلة بعد.")
-    }
+    if (items.isEmpty()) EmptyMessage("لا توجد قطع غيار مسجلة بعد.")
 
-    items.forEach { part ->
+    items.forEach { item ->
         InfoCard(
-            title = "${part.name} — ${part.number}",
+            title = "${item.name} — ${item.number}",
             details = """
-                التصنيف: ${part.category}
-                الكمية: ${part.quantity}
-                سعر الوحدة: ${money(part.price)} ريال
-            """.trimIndent()
+                التصنيف: ${item.category}
+                الكمية: ${item.quantity}
+                سعر الوحدة: ${money(item.price)} ريال
+            """.trimIndent(),
+            onEdit = { edit(item) },
+            onDelete = { delete(item) }
         )
     }
 }
@@ -506,40 +690,57 @@ private fun PageTitle(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
-            text = title,
+            title,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
-
         Button(onClick = onAction) {
             Text(action)
         }
     }
-
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(Modifier.height(8.dp))
 }
 
 @Composable
 private fun InfoCard(
     title: String,
-    details: String
+    details: String,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 5.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp)
-        ) {
-            Text(
-                text = title,
-                fontWeight = FontWeight.Bold
-            )
+        Column(Modifier.padding(14.dp)) {
+            Text(title, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text(details)
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(text = details)
+            if (onEdit != null || onDelete != null) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    if (onEdit != null) {
+                        TextButton(onClick = onEdit) {
+                            Text("تعديل")
+                        }
+                    }
+                    if (onDelete != null) {
+                        TextButton(
+                            onClick = onDelete,
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("حذف")
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -547,7 +748,7 @@ private fun InfoCard(
 @Composable
 private fun EmptyMessage(message: String) {
     Text(
-        text = message,
+        message,
         modifier = Modifier.padding(vertical = 14.dp),
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
