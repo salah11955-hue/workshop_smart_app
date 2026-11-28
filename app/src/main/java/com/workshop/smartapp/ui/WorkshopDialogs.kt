@@ -1,26 +1,15 @@
+
 package com.workshop.smartapp.ui
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -41,71 +30,75 @@ fun WorkshopFormDialog(
         }
     }
 
-    var selectedCustomerId by remember(type, customers) {
-        mutableStateOf(customers.firstOrNull()?.id)
+    var selectedCustomerId by remember(type) {
+        mutableStateOf<Long?>(null)
     }
-    var customerMenuExpanded by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
 
-    val selectedCustomer = customers.firstOrNull { it.id == selectedCustomerId }
+    var customerPickerOpen by remember {
+        mutableStateOf(false)
+    }
+
+    var error by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    val selectedCustomer =
+        customers.firstOrNull { it.id == selectedCustomerId }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = type.title) },
+        title = {
+            Text(type.title)
+        },
         text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(440.dp)
+                    .heightIn(max = 520.dp)
                     .verticalScroll(rememberScrollState())
             ) {
                 if (type.requiresCustomer) {
-                    if (customers.isEmpty()) {
-                        Text(
-                            text = "سجّل عميلاً أولاً قبل إضافة هذا السجل.",
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    } else {
-                        OutlinedTextField(
-                            value = selectedCustomer?.let {
-                                "#${it.id} — ${it.name} — ${it.phone}"
-                            } ?: "",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text(text = "اختر العميل") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { customerMenuExpanded = true }
-                                .padding(vertical = 4.dp)
-                        )
+                    Text(
+                        text = "العميل المرتبط بالسجل",
+                        style = MaterialTheme.typography.labelLarge
+                    )
 
-                        DropdownMenu(
-                            expanded = customerMenuExpanded,
-                            onDismissRequest = { customerMenuExpanded = false },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            customers.forEach { customer ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            "#${customer.id} — ${customer.name} — ${customer.phone}"
-                                        )
-                                    },
-                                    onClick = {
-                                        selectedCustomerId = customer.id
-                                        customerMenuExpanded = false
-                                    }
-                                )
-                            }
-                        }
+                    Spacer(Modifier.height(6.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            customerPickerOpen = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            selectedCustomer?.let {
+                                "${it.name} — ${it.phone}"
+                            } ?: "اضغط هنا للبحث واختيار العميل"
+                        )
                     }
+
+                    if (selectedCustomer == null) {
+                        Text(
+                            text = "لم يتم اختيار عميل بعد",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
                 }
 
                 type.fields.forEachIndexed { index, field ->
                     OutlinedTextField(
                         value = values[index],
-                        onValueChange = { values[index] = it },
-                        label = { Text(text = field.first) },
+                        onValueChange = {
+                            values[index] = it
+                            error = null
+                        },
+                        label = {
+                            Text(field.first)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
@@ -121,10 +114,10 @@ fun WorkshopFormDialog(
                     )
                 }
 
-                error?.let { message ->
+                error?.let {
+                    Spacer(Modifier.height(8.dp))
                     Text(
-                        text = message,
-                        modifier = Modifier.padding(top = 8.dp),
+                        text = it,
                         color = MaterialTheme.colorScheme.error
                     )
                 }
@@ -132,7 +125,7 @@ fun WorkshopFormDialog(
         },
         confirmButton = {
             TextButton(
-                enabled = !type.requiresCustomer || customers.isNotEmpty(),
+                enabled = !type.requiresCustomer || selectedCustomer != null,
                 onClick = {
                     error = onSave(
                         WorkshopFormSubmission(
@@ -142,12 +135,117 @@ fun WorkshopFormDialog(
                     )
                 }
             ) {
-                Text(text = "حفظ")
+                Text("حفظ")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(text = "إلغاء")
+                Text("إلغاء")
+            }
+        }
+    )
+
+    if (customerPickerOpen) {
+        CustomerPickerDialog(
+            customers = customers,
+            onDismiss = {
+                customerPickerOpen = false
+            },
+            onSelect = { customer ->
+                selectedCustomerId = customer.id
+                customerPickerOpen = false
+                error = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun CustomerPickerDialog(
+    customers: List<Customer>,
+    onDismiss: () -> Unit,
+    onSelect: (Customer) -> Unit
+) {
+    var query by remember {
+        mutableStateOf("")
+    }
+
+    val filteredCustomers = remember(customers, query) {
+        customers.filter {
+            it.name.contains(query, ignoreCase = true) ||
+                it.phone.contains(query, ignoreCase = true) ||
+                it.id.toString() == query.trim()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("اختيار العميل")
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 500.dp)
+            ) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = {
+                        query = it
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        Text("ابحث بالاسم أو رقم الهاتف")
+                    },
+                    singleLine = true
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                if (filteredCustomers.isEmpty()) {
+                    Text(
+                        text = "لا توجد نتائج مطابقة",
+                        modifier = Modifier.padding(12.dp)
+                    )
+                } else {
+                    LazyColumn {
+                        items(
+                            items = filteredCustomers,
+                            key = { it.id }
+                        ) { customer ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clickable {
+                                        onSelect(customer)
+                                    }
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp)
+                                ) {
+                                    Text(
+                                        customer.name,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Text("الهاتف: ${customer.phone}")
+                                    if (customer.car.isNotBlank()) {
+                                        Text("السيارة: ${customer.car}")
+                                    }
+                                    if (customer.plate.isNotBlank()) {
+                                        Text("اللوحة: ${customer.plate}")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("إغلاق")
             }
         }
     )
