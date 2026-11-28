@@ -1,3 +1,4 @@
+
 package com.workshop.smartapp.ui
 
 import androidx.compose.foundation.horizontalScroll
@@ -37,6 +38,7 @@ import com.workshop.smartapp.model.Invoice
 import com.workshop.smartapp.model.Part
 import com.workshop.smartapp.model.WorkshopForm
 import com.workshop.smartapp.model.WorkshopFormSubmission
+import com.workshop.smartapp.model.WorkshopPage
 import java.util.Locale
 
 private const val WORKSHOP_NAME = "ورشة خبراء هونداي وفورد"
@@ -45,14 +47,22 @@ private const val LOCATION = "صنعاء، جولة ٤٥، خلف مطعم ال�
 
 @Composable
 fun WorkshopApp(database: WorkshopDatabase) {
-    var page by remember { mutableStateOf(com.workshop.smartapp.model.WorkshopPage.HOME) }
+    var page by remember { mutableStateOf(WorkshopPage.HOME) }
     var activeForm by remember { mutableStateOf<WorkshopForm?>(null) }
     var refreshKey by remember { mutableIntStateOf(0) }
 
-    val customers = remember(refreshKey) { database.customers() }
-    val diagnostics = remember(refreshKey) { database.diagnostics() }
-    val invoices = remember(refreshKey) { database.invoices() }
-    val parts = remember(refreshKey) { database.inventory() }
+    val customers = remember(refreshKey) {
+        database.customers()
+    }
+    val diagnostics = remember(refreshKey) {
+        database.diagnostics()
+    }
+    val invoices = remember(refreshKey) {
+        database.invoices()
+    }
+    val parts = remember(refreshKey) {
+        database.inventory()
+    }
 
     CompositionLocalProvider(
         LocalLayoutDirection provides LayoutDirection.Rtl
@@ -72,6 +82,7 @@ fun WorkshopApp(database: WorkshopDatabase) {
                         fontSize = 23.sp,
                         fontWeight = FontWeight.Bold
                     )
+
                     Text(
                         text = "$LOCATION | للتواصل: $CONTACT",
                         style = MaterialTheme.typography.bodySmall
@@ -84,9 +95,18 @@ fun WorkshopApp(database: WorkshopDatabase) {
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState())
                     ) {
-                        com.workshop.smartapp.model.WorkshopPage.values().forEach { item ->
-                            TextButton(onClick = { page = item }) {
-                                Text(text = item.title)
+                        WorkshopPage.values().forEach { item ->
+                            TextButton(
+                                onClick = { page = item }
+                            ) {
+                                Text(
+                                    text = item.title,
+                                    fontWeight = if (page == item) {
+                                        FontWeight.Bold
+                                    } else {
+                                        FontWeight.Normal
+                                    }
+                                )
                             }
                         }
                     }
@@ -100,7 +120,7 @@ fun WorkshopApp(database: WorkshopDatabase) {
                             .verticalScroll(rememberScrollState())
                     ) {
                         when (page) {
-                            com.workshop.smartapp.model.WorkshopPage.HOME -> HomePage(
+                            WorkshopPage.HOME -> HomePage(
                                 customerCount = customers.size,
                                 diagnosticCount = diagnostics.size,
                                 invoiceCount = invoices.size,
@@ -108,22 +128,22 @@ fun WorkshopApp(database: WorkshopDatabase) {
                                 navigate = { page = it }
                             )
 
-                            com.workshop.smartapp.model.WorkshopPage.CUSTOMERS ->
+                            WorkshopPage.CUSTOMERS ->
                                 CustomersPage(customers) {
                                     activeForm = WorkshopForm.CUSTOMER
                                 }
 
-                            com.workshop.smartapp.model.WorkshopPage.DIAGNOSTICS ->
+                            WorkshopPage.DIAGNOSTICS ->
                                 DiagnosticsPage(diagnostics) {
                                     activeForm = WorkshopForm.DIAGNOSTIC
                                 }
 
-                            com.workshop.smartapp.model.WorkshopPage.INVOICES ->
+                            WorkshopPage.INVOICES ->
                                 InvoicesPage(invoices) {
                                     activeForm = WorkshopForm.INVOICE
                                 }
 
-                            com.workshop.smartapp.model.WorkshopPage.INVENTORY ->
+                            WorkshopPage.INVENTORY ->
                                 InventoryPage(parts) {
                                     activeForm = WorkshopForm.PART
                                 }
@@ -136,7 +156,9 @@ fun WorkshopApp(database: WorkshopDatabase) {
                 WorkshopFormDialog(
                     type = form,
                     customers = customers,
-                    onDismiss = { activeForm = null },
+                    onDismiss = {
+                        activeForm = null
+                    },
                     onSave = { submission ->
                         val error = saveForm(
                             form = form,
@@ -169,7 +191,12 @@ private fun saveForm(
     return try {
         when (form) {
             WorkshopForm.CUSTOMER -> {
-                if (values[0].isBlank() || values[1].isBlank()) {
+                if (values.size < 5) {
+                    "بيانات النموذج غير مكتملة"
+                } else if (
+                    values[0].isBlank() ||
+                    values[1].isBlank()
+                ) {
                     "اسم العميل ورقم الهاتف مطلوبان"
                 } else {
                     database.addCustomer(
@@ -184,7 +211,12 @@ private fun saveForm(
             }
 
             WorkshopForm.DIAGNOSTIC -> {
+                if (values.size < 3) {
+                    return "بيانات التقرير غير مكتملة"
+                }
+
                 val customerId = submission.customerId
+
                 when {
                     customerId == null ->
                         "اختر عميلاً أولاً"
@@ -208,6 +240,10 @@ private fun saveForm(
             }
 
             WorkshopForm.INVOICE -> {
+                if (values.size < 3) {
+                    return "بيانات الفاتورة غير مكتملة"
+                }
+
                 val customerId = submission.customerId
                 val partsCost = values[1].toDoubleOrNull()
                 val laborCost = values[2].toDoubleOrNull()
@@ -222,8 +258,10 @@ private fun saveForm(
                     values[0].isBlank() ->
                         "تفاصيل الصيانة مطلوبة"
 
-                    partsCost == null || laborCost == null ||
-                        partsCost < 0 || laborCost < 0 ->
+                    partsCost == null ||
+                        laborCost == null ||
+                        partsCost < 0 ||
+                        laborCost < 0 ->
                         "أدخل تكاليف صحيحة غير سالبة"
 
                     else -> {
@@ -239,15 +277,22 @@ private fun saveForm(
             }
 
             WorkshopForm.PART -> {
+                if (values.size < 5) {
+                    return "بيانات القطعة غير مكتملة"
+                }
+
                 val quantity = values[3].toIntOrNull()
                 val price = values[4].toDoubleOrNull()
 
                 when {
-                    values[0].isBlank() || values[1].isBlank() ->
+                    values[0].isBlank() ||
+                        values[1].isBlank() ->
                         "رقم القطعة واسمها مطلوبان"
 
-                    quantity == null || quantity < 0 ||
-                        price == null || price < 0 ->
+                    quantity == null ||
+                        quantity < 0 ||
+                        price == null ||
+                        price < 0 ->
                         "أدخل كمية وسعراً صحيحين"
 
                     else -> {
@@ -264,7 +309,9 @@ private fun saveForm(
             }
         }
     } catch (exception: Exception) {
-        "تعذر الحفظ: ${exception.localizedMessage ?: "خطأ غير معروف"}"
+        "تعذر الحفظ: ${
+            exception.localizedMessage ?: "خطأ غير معروف"
+        }"
     }
 }
 
@@ -274,26 +321,30 @@ private fun HomePage(
     diagnosticCount: Int,
     invoiceCount: Int,
     partCount: Int,
-    navigate: (com.workshop.smartapp.model.WorkshopPage) -> Unit
+    navigate: (WorkshopPage) -> Unit
 ) {
     Text(
         text = "إدارة الورشة من هاتفك",
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold
     )
+
     Spacer(modifier = Modifier.height(12.dp))
 
     SummaryCard("العملاء والمركبات", customerCount) {
-        navigate(com.workshop.smartapp.model.WorkshopPage.CUSTOMERS)
+        navigate(WorkshopPage.CUSTOMERS)
     }
+
     SummaryCard("تقارير الفحص", diagnosticCount) {
-        navigate(com.workshop.smartapp.model.WorkshopPage.DIAGNOSTICS)
+        navigate(WorkshopPage.DIAGNOSTICS)
     }
+
     SummaryCard("الفواتير", invoiceCount) {
-        navigate(com.workshop.smartapp.model.WorkshopPage.INVOICES)
+        navigate(WorkshopPage.INVOICES)
     }
+
     SummaryCard("قطع الغيار", partCount) {
-        navigate(com.workshop.smartapp.model.WorkshopPage.INVENTORY)
+        navigate(WorkshopPage.INVENTORY)
     }
 }
 
@@ -314,9 +365,13 @@ private fun SummaryCard(
                 .padding(14.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = "$title: $count", fontWeight = FontWeight.Bold)
+            Text(
+                text = "$title: $count",
+                fontWeight = FontWeight.Bold
+            )
+
             TextButton(onClick = onClick) {
-                Text(text = "فتح")
+                Text("فتح")
             }
         }
     }
@@ -327,7 +382,11 @@ private fun CustomersPage(
     items: List<Customer>,
     add: () -> Unit
 ) {
-    PageTitle("العملاء والمركبات", "تسجيل عميل", add)
+    PageTitle(
+        title = "العملاء والمركبات",
+        action = "تسجيل عميل",
+        onAction = add
+    )
 
     if (items.isEmpty()) {
         EmptyMessage("لا يوجد عملاء مسجلون بعد.")
@@ -335,12 +394,14 @@ private fun CustomersPage(
 
     items.forEach { customer ->
         InfoCard(
-            "#${customer.id} — ${customer.name}",
-            "الهاتف: ${customer.phone}\n" +
-                "السيارة: ${customer.car}\n" +
-                "اللوحة: ${customer.plate}\n" +
-                "ملاحظات: ${customer.notes}\n" +
-                "التسجيل: ${customer.createdAt}"
+            title = "#${customer.id} — ${customer.name}",
+            details = """
+                الهاتف: ${customer.phone}
+                السيارة: ${customer.car}
+                اللوحة: ${customer.plate}
+                ملاحظات: ${customer.notes}
+                التسجيل: ${customer.createdAt}
+            """.trimIndent()
         )
     }
 }
@@ -350,7 +411,11 @@ private fun DiagnosticsPage(
     items: List<Diagnostic>,
     add: () -> Unit
 ) {
-    PageTitle("تقارير فحص الأعطال", "إضافة تقرير", add)
+    PageTitle(
+        title = "تقارير فحص الأعطال",
+        action = "إضافة تقرير",
+        onAction = add
+    )
 
     if (items.isEmpty()) {
         EmptyMessage("لا توجد تقارير فحص مسجلة بعد.")
@@ -358,11 +423,13 @@ private fun DiagnosticsPage(
 
     items.forEach { diagnostic ->
         InfoCard(
-            "تقرير #${diagnostic.id} — ${diagnostic.customerName}",
-            "النظام: ${diagnostic.system}\n" +
-                "أكواد DTC: ${diagnostic.codes}\n" +
-                "ملاحظات الفني: ${diagnostic.notes}\n" +
-                "التاريخ: ${diagnostic.date}"
+            title = "تقرير #${diagnostic.id} — ${diagnostic.customerName}",
+            details = """
+                النظام: ${diagnostic.system}
+                أكواد DTC: ${diagnostic.codes}
+                ملاحظات الفني: ${diagnostic.notes}
+                التاريخ: ${diagnostic.date}
+            """.trimIndent()
         )
     }
 }
@@ -372,11 +439,15 @@ private fun InvoicesPage(
     items: List<Invoice>,
     add: () -> Unit
 ) {
-    PageTitle("الفواتير والإيرادات", "إصدار فاتورة", add)
+    PageTitle(
+        title = "الفواتير والإيرادات",
+        action = "إصدار فاتورة",
+        onAction = add
+    )
 
     InfoCard(
-        "إجمالي الإيرادات المسجلة",
-        "${money(items.sumOf { it.total })} ريال"
+        title = "إجمالي الإيرادات المسجلة",
+        details = "${money(items.sumOf { it.total })} ريال"
     )
 
     if (items.isEmpty()) {
@@ -385,12 +456,14 @@ private fun InvoicesPage(
 
     items.forEach { invoice ->
         InfoCard(
-            "فاتورة #${invoice.id} — ${invoice.customerName} (${invoice.car})",
-            "الأعمال: ${invoice.details}\n" +
-                "قطع الغيار: ${money(invoice.parts)} ريال\n" +
-                "أجور اليد: ${money(invoice.labor)} ريال\n" +
-                "الإجمالي: ${money(invoice.total)} ريال\n" +
-                "التاريخ: ${invoice.date}"
+            title = "فاتورة #${invoice.id} — ${invoice.customerName} (${invoice.car})",
+            details = """
+                الأعمال: ${invoice.details}
+                قطع الغيار: ${money(invoice.parts)} ريال
+                أجور اليد: ${money(invoice.labor)} ريال
+                الإجمالي: ${money(invoice.total)} ريال
+                التاريخ: ${invoice.date}
+            """.trimIndent()
         )
     }
 }
@@ -400,7 +473,11 @@ private fun InventoryPage(
     items: List<Part>,
     add: () -> Unit
 ) {
-    PageTitle("مخزون قطع الغيار", "إضافة / تحديث", add)
+    PageTitle(
+        title = "مخزون قطع الغيار",
+        action = "إضافة / تحديث",
+        onAction = add
+    )
 
     if (items.isEmpty()) {
         EmptyMessage("لا توجد قطع غيار مسجلة بعد.")
@@ -408,10 +485,12 @@ private fun InventoryPage(
 
     items.forEach { part ->
         InfoCard(
-            "${part.name} — ${part.number}",
-            "التصنيف: ${part.category}\n" +
-                "الكمية: ${part.quantity}\n" +
-                "سعر الوحدة: ${money(part.price)} ريال"
+            title = "${part.name} — ${part.number}",
+            details = """
+                التصنيف: ${part.category}
+                الكمية: ${part.quantity}
+                سعر الوحدة: ${money(part.price)} ريال
+            """.trimIndent()
         )
     }
 }
@@ -431,23 +510,35 @@ private fun PageTitle(
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
+
         Button(onClick = onAction) {
-            Text(text = action)
+            Text(action)
         }
     }
+
     Spacer(modifier = Modifier.height(8.dp))
 }
 
 @Composable
-private fun InfoCard(title: String, details: String) {
+private fun InfoCard(
+    title: String,
+    details: String
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 5.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(text = title, fontWeight = FontWeight.Bold)
+        Column(
+            modifier = Modifier.padding(14.dp)
+        ) {
+            Text(
+                text = title,
+                fontWeight = FontWeight.Bold
+            )
+
             Spacer(modifier = Modifier.height(4.dp))
+
             Text(text = details)
         }
     }
