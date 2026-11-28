@@ -1,3 +1,14 @@
+
 __pycache__/
 *.py[cod]
 *.db
+
+# Android build files
+.gradle/
+build/
+app/build/
+local.properties
+
+# Signing keys
+*.jks
+*.keystore
