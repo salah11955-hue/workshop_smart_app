@@ -39,6 +39,37 @@ data class Part(
     val price: Double
 )
 
+data class Vehicle(
+    val id: Long,
+    val customerId: Long,
+    val makeModel: String,
+    val plate: String,
+    val vin: String = "",
+    val year: String = "",
+    val color: String = "",
+    val createdAt: String = ""
+)
+
+data class WorkshopVisit(
+    val id: Long,
+    val customerId: Long,
+    val vehicleId: Long,
+    val odometer: Long,
+    val complaint: String,
+    val notes: String,
+    val status: String,
+    val date: String
+)
+
+data class WorkshopAuditEntry(
+    val id: Long,
+    val action: String,
+    val entityType: String,
+    val entityId: String,
+    val description: String,
+    val date: String
+)
+
 enum class WorkshopPage(val title: String) {
     HOME("الرئيسية"),
     CUSTOMERS("العملاء والمركبات"),
