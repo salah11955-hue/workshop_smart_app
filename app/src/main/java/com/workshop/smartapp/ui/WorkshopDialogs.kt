@@ -22,34 +22,35 @@ fun WorkshopFormDialog(
     type: WorkshopForm,
     customers: List<Customer>,
     onDismiss: () -> Unit,
-    onSave: (WorkshopFormSubmission) -> String?
+    onSave: (WorkshopFormSubmission) -> String?,
+    initialValues: List<String> = emptyList(),
+    initialCustomerId: Long? = null,
+    showCustomerPicker: Boolean = type.requiresCustomer,
+    dialogTitle: String = type.title,
+    saveLabel: String = "حفظ"
 ) {
-    val values = remember(type) {
+    val values = remember(type, initialValues) {
         mutableStateListOf<String>().apply {
-            addAll(type.fields.map { "" })
+            type.fields.forEachIndexed { index, _ ->
+                add(initialValues.getOrNull(index).orEmpty())
+            }
         }
     }
 
-    var selectedCustomerId by remember(type) {
-        mutableStateOf<Long?>(null)
+    var selectedCustomerId by remember(type, initialCustomerId) {
+        mutableStateOf(initialCustomerId)
     }
 
-    var customerPickerOpen by remember {
-        mutableStateOf(false)
-    }
+    var customerPickerOpen by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    var error by remember {
-        mutableStateOf<String?>(null)
+    val selectedCustomer = customers.firstOrNull {
+        it.id == selectedCustomerId
     }
-
-    val selectedCustomer =
-        customers.firstOrNull { it.id == selectedCustomerId }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(type.title)
-        },
+        title = { Text(dialogTitle) },
         text = {
             Column(
                 modifier = Modifier
@@ -57,7 +58,7 @@ fun WorkshopFormDialog(
                     .heightIn(max = 520.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                if (type.requiresCustomer) {
+                if (showCustomerPicker) {
                     Text(
                         text = "العميل المرتبط بالسجل",
                         style = MaterialTheme.typography.labelLarge
@@ -66,9 +67,7 @@ fun WorkshopFormDialog(
                     Spacer(Modifier.height(6.dp))
 
                     OutlinedButton(
-                        onClick = {
-                            customerPickerOpen = true
-                        },
+                        onClick = { customerPickerOpen = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
@@ -96,9 +95,7 @@ fun WorkshopFormDialog(
                             values[index] = it
                             error = null
                         },
-                        label = {
-                            Text(field.first)
-                        },
+                        label = { Text(field.first) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
@@ -110,7 +107,8 @@ fun WorkshopFormDialog(
                             }
                         ),
                         singleLine = !field.first.contains("ملاحظات") &&
-                            !field.first.contains("تفاصيل")
+                            !field.first.contains("تفاصيل") &&
+                            !field.first.contains("أكواد")
                     )
                 }
 
@@ -125,7 +123,7 @@ fun WorkshopFormDialog(
         },
         confirmButton = {
             TextButton(
-                enabled = !type.requiresCustomer || selectedCustomer != null,
+                enabled = !showCustomerPicker || selectedCustomer != null,
                 onClick = {
                     error = onSave(
                         WorkshopFormSubmission(
@@ -135,7 +133,7 @@ fun WorkshopFormDialog(
                     )
                 }
             ) {
-                Text("حفظ")
+                Text(saveLabel)
             }
         },
         dismissButton = {
@@ -148,11 +146,9 @@ fun WorkshopFormDialog(
     if (customerPickerOpen) {
         CustomerPickerDialog(
             customers = customers,
-            onDismiss = {
-                customerPickerOpen = false
-            },
-            onSelect = { customer ->
-                selectedCustomerId = customer.id
+            onDismiss = { customerPickerOpen = false },
+            onSelect = {
+                selectedCustomerId = it.id
                 customerPickerOpen = false
                 error = null
             }
@@ -166,9 +162,7 @@ private fun CustomerPickerDialog(
     onDismiss: () -> Unit,
     onSelect: (Customer) -> Unit
 ) {
-    var query by remember {
-        mutableStateOf("")
-    }
+    var query by remember { mutableStateOf("") }
 
     val filteredCustomers = remember(customers, query) {
         customers.filter {
@@ -180,9 +174,7 @@ private fun CustomerPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text("اختيار العميل")
-        },
+        title = { Text("اختيار العميل") },
         text = {
             Column(
                 modifier = Modifier
@@ -191,13 +183,9 @@ private fun CustomerPickerDialog(
             ) {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = {
-                        query = it
-                    },
+                    onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = {
-                        Text("ابحث بالاسم أو رقم الهاتف")
-                    },
+                    label = { Text("ابحث بالاسم أو رقم الهاتف") },
                     singleLine = true
                 )
 
@@ -218,9 +206,7 @@ private fun CustomerPickerDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
-                                    .clickable {
-                                        onSelect(customer)
-                                    }
+                                    .clickable { onSelect(customer) }
                             ) {
                                 Column(
                                     modifier = Modifier.padding(12.dp)
@@ -230,9 +216,11 @@ private fun CustomerPickerDialog(
                                         style = MaterialTheme.typography.titleMedium
                                     )
                                     Text("الهاتف: ${customer.phone}")
+
                                     if (customer.car.isNotBlank()) {
                                         Text("السيارة: ${customer.car}")
                                     }
+
                                     if (customer.plate.isNotBlank()) {
                                         Text("اللوحة: ${customer.plate}")
                                     }
