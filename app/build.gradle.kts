@@ -1,8 +1,26 @@
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val releaseStorePassword =
+    providers.environmentVariable("KEYSTORE_PASSWORD").orNull
+
+val releaseKeyAlias =
+    providers.environmentVariable("KEY_ALIAS").orNull
+
+val releaseKeyPassword =
+    providers.environmentVariable("KEY_PASSWORD").orNull
+
+val releaseKeystoreFile = file("release-keystore.jks")
+
+val hasReleaseSigning =
+    releaseKeystoreFile.exists() &&
+    !releaseStorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank()
 
 android {
     namespace = "com.workshop.smartapp"
@@ -16,8 +34,40 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = releaseKeystoreFile
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("debug")
+
+        getByName("release") {
+            isMinifyEnabled = false
+
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
+
     buildFeatures {
         compose = true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
     }
 }
 
@@ -28,15 +78,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.core:core-ktx:1.15.0")
-    debugImplementation("androidx.compose.ui:ui-tooling")
-}
-android {
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    debugImplementation("androidx.compose.ui:ui-tooling")
 }
