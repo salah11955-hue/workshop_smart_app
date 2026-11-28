@@ -808,7 +808,7 @@ class WorkshopDatabase(context: Context) :
             put("category", category.trim())
             put("quantity", quantity)
             put("unit_price", price)
-            put("last_updated", "CURRENT_TIMESTAMP")
+            
         }
 
         val db = writableDatabase
@@ -818,7 +818,12 @@ class WorkshopDatabase(context: Context) :
             "part_number = ?",
             arrayOf(oldNumber)
         ) > 0
-
+if (changed) {
+    db.execSQL(
+        "UPDATE inventory SET last_updated = CURRENT_TIMESTAMP WHERE part_number = ?",
+        arrayOf(number.trim())
+    )
+}
         if (changed) {
             log(db, "تعديل", "قطعة غيار", number, "تعديل قطعة الغيار: $name")
         }
